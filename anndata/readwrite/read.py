@@ -139,13 +139,13 @@ def read_loom(filename: PathLike, sparse: bool = True, cleanup: bool = False, X_
         The filename.
     sparse
         Whether to read the data matrix as sparse.
-    cleanup: 
+    cleanup:
         Whether to remove all obs/var keys that do not store more than one unique value.
     X_name:
         Loompy key where the data matrix is stored.
     obs_names:
         Loompy key where the observation/cell names are stored.
-    var_names: 
+    var_names:
         Loompy key where the variable/gene names are stored.
     """
     filename = fspath(filename)  # allow passing pathlib.Path objects
@@ -406,7 +406,7 @@ def _read_key_value_from_zarr(f, d, key, key_write=None):
     return
 
 
-def read_h5ad(filename, backed: Union[bool, str] = False):
+def read_h5ad(filename, backed: Union[bool, str] = False, rd = False):
     """Read ``.h5ad``-formatted hdf5 file.
 
     Parameters
@@ -425,11 +425,11 @@ def read_h5ad(filename, backed: Union[bool, str] = False):
         return AnnData(filename=filename, filemode=backed)
     else:
         # load everything into memory
-        d = _read_h5ad(filename=filename)
+        d = _read_h5ad(filename=filename, rd=rd)
         return AnnData(d)
 
 
-def _read_h5ad(adata: AnnData = None, filename: Optional[PathLike] = None, mode: str = None):
+def _read_h5ad(adata: AnnData = None, filename: Optional[PathLike] = None, mode: str = None, rd = False):
     """Return a dict with arrays for initializing AnnData.
 
     Parameters
@@ -456,7 +456,7 @@ def _read_h5ad(adata: AnnData = None, filename: Optional[PathLike] = None, mode:
         if backed and key in AnnData._BACKED_ATTRS:
             d[key] = None
         else:
-            _read_key_value_from_h5(f, d, key)
+            _read_key_value_from_h5(f, d, key, rd=rd)
     # backwards compat: save X with the correct name
     if 'X' not in d:
         if backed == 'r+':
@@ -475,18 +475,23 @@ def _read_h5ad(adata: AnnData = None, filename: Optional[PathLike] = None, mode:
     return d
 
 
-def _read_key_value_from_h5(f, d, key, key_write=None):
+def _read_key_value_from_h5(f, d, key, key_write=None, rd = False):
     if key_write is None: key_write = key
     if isinstance(f[key], h5py.Group):
         d[key_write] = OrderedDict() if key == 'uns' else {}
         for k in f[key].keys():
-            _read_key_value_from_h5(f, d[key_write], key + '/' + k, k)
+            _read_key_value_from_h5(f, d[key_write], key + '/' + k, k, rd=rd)
         return
 
     ds = f[key]
 
     if isinstance(ds, h5py.Dataset) and 'sparse_format' in ds.attrs:
         value = h5py._load_h5_dataset_as_sparse(ds)
+    elif rd and isinstance(ds, h5py.Dataset):
+        value = np.empty(ds.shape, ds.dtype)
+        ds.read_direct(value)
+    elif rd and isinstance(ds, h5py.SparseDataset):
+        value = ds.value(rd)
     else:
         value = ds[()]
     # the '()' means 'load everything into memory' (by contrast, ':'

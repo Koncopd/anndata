@@ -3,17 +3,7 @@ from ..base import AnnData
 import numpy as np
 import scipy.sparse as ss
 
-FORMAT_DICT = {
-    'csr': ss.csr_matrix,
-    'csc': ss.csc_matrix,
-}
-
-def get_format_class(format_str):
-    format_class = FORMAT_DICT.get(format_str, None)
-    if format_class is None:
-        raise ValueError("Format string {} is not supported."
-                         .format(format_str))
-    return format_class
+from ..h5py.h5sparse import get_format_class
 
 def postprocess_reading(key, value):
     # record arrays should stay record arrays and not become scalars
