@@ -1,5 +1,19 @@
 from .. import h5py
 from ..base import AnnData
+import numpy as np
+import scipy.sparse as ss
+
+FORMAT_DICT = {
+    'csr': ss.csr_matrix,
+    'csc': ss.csc_matrix,
+}
+
+def get_format_class(format_str):
+    format_class = FORMAT_DICT.get(format_str, None)
+    if format_class is None:
+        raise ValueError("Format string {} is not supported."
+                         .format(format_str))
+    return format_class
 
 def postprocess_reading(key, value):
     # record arrays should stay record arrays and not become scalars
@@ -37,9 +51,20 @@ def read_alt(filename):
             for key in keys[:-1]:
                 dic = dic.setdefault(key, {})
             if sparse:
-                object = h5py.SparseDataset(object)
+                format_class = get_format_class(object.attrs['h5sparse_format'])
+                shape = tuple(object.attrs['h5sparse_shape'])
+                data_array = format_class(shape, dtype=object['data'].dtype)
+                data_array.data = np.empty(object['data'].shape, object['data'].dtype)
+                data_array.indices = np.empty(object['indices'].shape, object['indices'].dtype)
+                data_array.indptr = np.empty(object['indptr'].shape, object['indptr'].dtype)
+                object['data'].read_direct(data_array.data)
+                object['indices'].read_direct(data_array.indices)
+                object['indptr'].read_direct(data_array.indptr)
                 ignore.append(keys[-1])
-            key, value = postprocess_reading(keys[-1], object[()])
+            else:
+                data_array = np.empty(object.shape, object.dtype)
+                object.read_direct(data_array)
+            key, value = postprocess_reading(keys[-1], data_array)
             dic[key] = value
     f.h5py_group.visititems(tour)
     return AnnData(d)
