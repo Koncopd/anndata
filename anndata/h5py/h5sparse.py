@@ -46,7 +46,7 @@ def _load_h5_dataset_as_sparse(sds, chunk_size=6000):
 
     data = None
 
-    for chunk, _, _ in _chunked_rows(sds, chunk_size):
+    for chunk, _, _ in _chunked_rows(sds, chunk_size, True):
         data = sparse_class(chunk) if data is None else ss.vstack([data, sparse_class(chunk)])
 
     return data
