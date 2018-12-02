@@ -2,6 +2,7 @@ from .. import h5py
 from ..base import AnnData
 import numpy as np
 import scipy.sparse as ss
+from collections import OrderedDict
 
 from ..h5py.h5sparse import get_format_class
 
@@ -57,4 +58,69 @@ def read_alt(filename):
             key, value = postprocess_reading(keys[-1], data_array)
             dic[key] = value
     f.h5py_group.visititems(tour)
+    return AnnData(d)
+
+def read_ds_direct(ds):
+    if isinstance(ds, h5py.Dataset):
+        data_array = np.empty(ds.shape, ds.dtype)
+        ds.read_direct(data_array)
+    elif isinstance(ds, h5py.SparseDataset):
+        data_array = ds.value(True)
+    else:
+        data_array = ds[()]
+    return data_array
+
+def read_tree(group, d):
+    ignore = []
+    def tour(name, object):
+        dic = d
+        sparse = 'h5sparse_format' in object.attrs
+        ds = isinstance(object, h5py.Dataset)
+        if sparse or ds:
+            keys = name.split('/')
+            if len(keys) > 1 and keys[-2] in ignore:
+                return None
+            for key in keys[:-1]:
+                dic = dic.setdefault(key, {})
+            if sparse:
+                object = h5py.SparseDataset(object)
+                ignore.append(keys[-1])
+            key, value = postprocess_reading(keys[-1], read_ds_direct(object))
+            dic[key] = value
+    group.visititems(tour)
+
+def read_no_recursion(filename):
+    d = {}
+    d['uns'] = OrderedDict()
+    f = h5py.File(filename)
+    f_keys = set(f.keys())
+    raw = {'raw.X', 'raw.var', 'raw.varm', 'raw.cat'}
+
+    for k, v in AnnData._H5_ALIASES.items():
+        sv = set(v)
+        key = (sv & f_keys)
+        if len(key) > 0:
+            key = key.pop()
+        else:
+            continue
+        if key in AnnData._H5_ALIASES['layers']:
+            d['layers'] = OrderedDict()
+            for l in f[key].keys():
+                _, d['layers'][l] = postprocess_reading(l, read_ds_direct(f[key][l]))
+        elif key in AnnData._H5_ALIASES['uns']:
+            read_tree(f[key].h5py_group, d['uns'])
+        else:
+            _, d[k] = postprocess_reading(k, read_ds_direct(f[key]))
+        f_keys = f_keys - sv
+
+    for k in raw:
+        if k in f_keys:
+            _, d[k] = postprocess_reading(k, read_ds_direct(f[k]))
+    f_keys = f_keys - raw
+
+    for k in f_keys:
+        if isninstance(f[k], (h5py.Dataset, h5py.SparseDataset)):
+            _, d['uns'][k] = postprocess_reading(k, read_ds_direct(f[k]))
+        else:
+            read_tree(f[k].h5py_group, d['uns'])
     return AnnData(d)
