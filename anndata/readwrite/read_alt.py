@@ -92,7 +92,7 @@ def read_tree(group, d):
 def read_no_recursion(filename):
     d = {}
     d['uns'] = OrderedDict()
-    f = h5py.File(filename)
+    f = h5py.File(filename, 'r')
     f_keys = set(f.keys())
     raw = {'raw.X', 'raw.var', 'raw.varm', 'raw.cat'}
 
@@ -123,4 +123,5 @@ def read_no_recursion(filename):
             _, d['uns'][k] = postprocess_reading(k, read_ds_direct(f[k]))
         else:
             read_tree(f[k].h5py_group, d['uns'])
+    f.close()
     return AnnData(d)
