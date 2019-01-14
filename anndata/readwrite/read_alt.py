@@ -127,3 +127,45 @@ def read_no_recursion(filename, ppr=True):
             read_tree(f[k].h5py_group, d['uns'])
     f.close()
     return AnnData(d)
+
+def diagnostics(filename):
+    d = {}
+    d['uns'] = OrderedDict()
+    f = h5py.File(filename, 'r')
+
+    ds = read_ds_direct(f['X'])
+    _, d['X'] = postprocess_reading('X', ds)
+
+    ds = read_ds_direct(f['obs'])
+    _, d['obs'] = postprocess_reading('obs', ds)
+
+    ds = read_ds_direct(f['var'])
+    _, d['var'] = postprocess_reading('var', ds)
+
+    ds = read_ds_direct(f['uns/cell_id_categories'])
+    _, d['uns']['cell_id_categories'] = postprocess_reading('other', ds)
+
+    ds = read_ds_direct(f['uns/distil_id_categories'])
+    _, d['uns']['distil_id_categories'] = postprocess_reading('other', ds)
+
+    ds = read_ds_direct(f['uns/pert_dose_categories'])
+    _, d['uns']['pert_dose_categories'] = postprocess_reading('other', ds)
+
+    ds = read_ds_direct(f['uns/pert_id_categories'])
+    _, d['uns']['pert_id_categories'] = postprocess_reading('other', ds)
+
+    ds = read_ds_direct(f['uns/pert_iname_categories'])
+    _, d['uns']['pert_iname_categories'] = postprocess_reading('other', ds)
+
+    ds = read_ds_direct(f['uns/pert_itime_categories'])
+    _, d['uns']['pert_itime_categories'] = postprocess_reading('other', ds)
+
+    ds = read_ds_direct(f['uns/pert_time_unit_categories'])
+    _, d['uns']['pert_time_unit_categories'] = postprocess_reading('other', ds)
+
+    ds = read_ds_direct(f['uns/pert_type_categories'])
+    _, d['uns']['pert_type_categories'] = postprocess_reading('other', ds)
+
+    del ds
+    ad = AnnData(d)
+    return ad              
