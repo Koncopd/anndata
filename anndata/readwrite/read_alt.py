@@ -146,7 +146,15 @@ def diagnostics(filename):
     _, d['uns']['cell_id_categories'] = postprocess_reading('other', ds)
 
     ds = read_ds_direct(f['uns/distil_id_categories'])
-    _, d['uns']['distil_id_categories'] = postprocess_reading('other', ds)
+    if ds.ndim == 1 and len(ds) == 1 and ds.dtype.names is None:
+        ds = ds[0]
+    if ds.dtype.kind == 'S':
+        ds = ds.astype(str)
+    if not isinstance(ds, dict) and ds.dtype.names is not None:
+        new_dtype = [((dt[0], 'U{}'.format(int(int(dt[1][2:])/4)))
+                      if dt[1][1] == 'S' else dt) for dt in ds.dtype.descr]
+        ds = ds.astype(new_dtype)
+    d['uns']['distil_id_categories'] = ds
 
     ds = read_ds_direct(f['uns/pert_dose_categories'])
     _, d['uns']['pert_dose_categories'] = postprocess_reading('other', ds)
@@ -167,5 +175,6 @@ def diagnostics(filename):
     _, d['uns']['pert_type_categories'] = postprocess_reading('other', ds)
 
     del ds
-    ad = AnnData(d)
-    return ad              
+    X, obs, var, uns, obsm, varm, raw, layers = AnnData._from_dict(d)
+    ad = AnnData(X, obs, var, uns, obsm, varm, raw, layers)
+    return ad
