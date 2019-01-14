@@ -6,7 +6,9 @@ from collections import OrderedDict
 
 from ..h5py.h5sparse import get_format_class
 
-def postprocess_reading(key, value):
+def postprocess_reading(key, value, ppr=True):
+    if not ppr:
+        return key, value
     # record arrays should stay record arrays and not become scalars
     if value.ndim == 1 and len(value) == 1 and value.dtype.names is None:
         value = value[0]
@@ -27,7 +29,7 @@ def postprocess_reading(key, value):
         value = value.astype(new_dtype, copy=False)
     return key, value
 
-def read_alt(filename):
+def read_alt(filename, ppr=True):
     d = {}
     ignore = []
     f = h5py.File(filename)
@@ -55,7 +57,7 @@ def read_alt(filename):
             else:
                 data_array = np.empty(object.shape, object.dtype)
                 object.read_direct(data_array)
-            key, value = postprocess_reading(keys[-1], data_array)
+            key, value = postprocess_reading(keys[-1], data_array, ppr)
             dic[key] = value
     f.h5py_group.visititems(tour)
     return AnnData(d)
@@ -89,7 +91,7 @@ def read_tree(group, d):
             dic[key] = value
     group.visititems(tour)
 
-def read_no_recursion(filename):
+def read_no_recursion(filename, ppr=True):
     d = {}
     d['uns'] = OrderedDict()
     f = h5py.File(filename, 'r')
